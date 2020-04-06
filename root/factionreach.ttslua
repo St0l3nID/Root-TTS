@@ -1,0 +1,177 @@
+-- fixed reach values
+tReachByPlayerCount = {0, 17,18,21,25,28}
+
+
+-- counts seatet players, without spectators
+nPlayerCount = 0
+nPlayersLeft = nPlayerCount
+nPointsSoFar = 0
+nPlayersPicked = 0
+
+function onload()
+  updateReachMax()
+  printToAll("1")
+end
+function onPlayerChangeColor(sPlayerColor)
+    updateReachMax()
+    printToAll("2")
+end
+function onPlayerDisconnect()
+    updateReachMax()
+    printToAll("3")
+end
+function onPlayerConnect()
+    updateReachMax()
+    printToAll("4")
+end
+
+function updateReachPicked(mod)
+  nPlayersPicked = nPlayersPicked + mod
+  nPlayersLeft = nPlayerCount - nPlayersPicked
+end
+
+function updateReachMax()
+  nPlayerCount = 0
+  for name, object in pairs(getSeatedPlayers()) do
+    nPlayerCount = nPlayerCount + 1
+    broadcastToAll(name.." is seated")
+  end
+  updateReachPicked(0)
+  broadcastToAll("PlayerCount: "..nPlayerCount)
+  if nPlayerCount > 0 then
+    checkForValidPicks()
+  end
+end
+
+
+function increaseCurrentReach(nMod)
+  updateReachPicked(1)
+  nPointsSoFar = nPointsSoFar + nMod
+end
+
+function initializeReach()
+  updateReachMax()
+end
+
+function validateReach()
+    updateReachMax()
+end
+
+tPicked = {}
+function checkForValidPicks()
+    tReach = getPickableReachList()
+    --for x,y  in pairs(tReach) do
+    --  printToAll(x..y)
+    --end
+
+    local nReachToReach = tReachByPlayerCount[nPlayerCount]
+
+    broadcastToAll("Reach to reach: "..nReachToReach.." PointsSofar:"..nPointsSoFar.." playersLeft:"..nPlayersLeft, "Red")
+    -- to know if a pick is valid we create different table setups
+    -- and then check if this assumed setup is valid
+    nPlayersLeftLocal = nPlayersLeft - 1
+    for i, v in pairs(tReach) do
+        if(v ~= nil) then
+            local tTemp = sCopy(tReach)
+            tTemp[i] = nil
+            --broadcastToAll(i,"Yellow")
+            if(  validateSetup(tTemp, nPointsSoFar+v, nPlayersLeftLocal) ) then
+                tPicked[i] = v
+                greenBorder(i)
+                --broadcastToAll(i.."|"..v.."|"..tPicked[i],"Green")
+            else
+                --broadcastToAll(i.."|"..v.."|"..tReach[i],"Red")
+                redBorder(i)
+                tReach[i] = nil
+            end
+        end
+    end
+
+    --broadcastToAll("Pickable Factions:", "Yellow")
+    for i, v in pairs(tPicked) do
+      if v~=nil then
+        --broadcastToAll(""..i.."|"..v)
+      end
+    end
+
+    --setAllUIs()
+    --Global.call("updateAllButtons")
+end
+
+
+-- The following code could be streamlined to be more efficient,
+-- but this way we dont have to care for sorting the reach-table by reach-values
+-- if we were to run into runtime issues, the list could be presorted (in data class preferably)
+-- from high reach to lowest, and then we can abort as soon as one check fails instead of checking all remaining
+-- tPoss = still possible factions
+-- nPsf  = points so far
+-- nPltp = Players left to pick
+function validateSetup(tPoss, nPsf, nPltp)
+    --broadcastToAll("tPoss"..#tPoss.." nPsf"..nPsf.." nPltp"..nPltp)
+
+    if(nPsf >= tReachByPlayerCount[nPlayerCount]) then
+      return true
+    end
+
+    for i, v in pairs(tPoss) do
+        if(v ~= nil) then
+            local tTemp = sCopy(tPoss)
+            if(nPltp <= 0) then
+              return false
+            end
+
+            local nTemp = nPsf + v
+            --broadcastToAll(nTemp)
+            if( nTemp >= tReachByPlayerCount[nPlayerCount]) then
+                --broadcastToAll("true for "..i.."|"..v, "Green")
+                return true
+            end
+
+            -- new assumed score is not high enough so we clone the table and pick another faction from it
+            tTemp[i] = nil
+            --broadcastToAll("nested:")
+            if( validateSetup(tTemp, nTemp, nPltp-1) ) then
+                --broadcastToAll("true for "..i.."|"..v, "Green")
+                return true -- subsequent picks proved to be enough
+            else
+                tPoss[i] = nil --none of the following picks made our result valid
+            end
+        --else broadcastToAll("nil")
+        end
+    end
+
+    --broadcastToAll("false", "Red")
+    return false -- no picks (nor their subsequent picks) managed to achieve our reach
+end
+
+
+
+-- Returns a 1 layer deep copy of given parameter
+function sCopy(orig)
+    local orig_type = type(orig)
+    local copy
+    if(orig_type == 'table') then
+        copy = {}
+        for orig_key, orig_value in pairs(orig) do
+            copy[orig_key] = orig_value
+        end
+    else -- number, string, boolean, etc
+        copy = orig
+    end
+    return copy
+end
+
+
+function redBorder(sFaction)
+    for _, x in ipairs(factionboards) do
+      x.call("redBorder", sFaction)
+    end
+    return 1
+end
+
+function greenBorder(sFaction)
+    for _, x in ipairs(factionboards) do
+      x.call("greenBorder", sFaction)
+    end
+    return 1
+end

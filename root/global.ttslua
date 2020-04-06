@@ -1,0 +1,63 @@
+#include factionDataClass
+#include uiHandler
+#include factionreach
+
+
+
+colors = {Blue=true, Orange=true, Teal=true, Yellow=true, Green=true,
+          Purple=true, White=true, Red=true, Brown=true, Pink=true}
+
+factionboards = {}
+bot = false
+
+function ImHere(par)
+    factionboards[#factionboards+1] = par[1]
+    return uiXML
+end
+
+function ImGone(par)
+    local where = 0
+    for x=1, #factionboards do
+        if factionboards[x] == par[1] then
+            table.remove(factionboards, x)
+            break
+        end
+    end
+
+    if #factionboards == 0 then
+      printToAll("Picking finished :)")
+      setupQuests()
+    end
+end
+
+function FactionChosen(buttonName)
+    updateAllButtons(buttonName)
+end
+
+--TODO this should really be only trigged by vaga spawning
+function setupQuests()
+    local quest_board = getObjectFromGUID('afea2f')
+    local quest_deck = getObjectFromGUID('5f5c6c')
+    quest_board.call("click_refillQuests")
+end
+
+
+function updateAllButtons(sButton)
+    for _, x in ipairs(factionboards) do
+      x.call("hideButton", sButton)
+    end
+    return 1
+end
+
+function setAllUIs()
+    customizeUI()
+    for _, x in ipairs(factionboards) do
+      x.call('setUI', uiXML)
+    end
+
+    initializeReach()
+end
+
+function onLoad(save_state)
+  customizeUI()
+end
